@@ -26,6 +26,12 @@ export interface AppConfig {
   openApiPath: string;
   kafkaProperties: KafkaConfigurations;
   mongoProperties: MongoProps;
+  auth: {
+    enabled: boolean;
+    jwtKeyUrl: string;
+    jwtKey: string;
+    WRITE_SCOPE: string;
+  };
 }
 
 export interface MongoProps {
@@ -34,6 +40,8 @@ export interface MongoProps {
   dbPassword: string;
   dbName: string;
   dbUrl: string; // allow overriding all the url
+  writeConcern: string;
+  writeAckTimeout: number;
 }
 export interface KafkaConfigurations {
   kafkaMessagingEnabled: boolean;
@@ -73,11 +81,19 @@ const buildAppContext = async (secrets: any): Promise<AppConfig> => {
       dbUser: secrets.DB_USERNAME || process.env.DB_USERNAME,
       dbPassword: secrets.DB_PASSWORD || process.env.DB_PASSWORD,
       dbUrl: secrets.DB_URL || process.env.DB_URL || `mongodb://localhost:27027/appdb`,
+      writeConcern: process.env.DEFAULT_WRITE_CONCERN || 'majority',
+      writeAckTimeout: Number(process.env.DEFAULT_WRITE_ACK_TIMEOUT) || 5000,
     },
     kafkaProperties: {
       kafkaBrokers: process.env.KAFKA_BROKERS?.split(',') || new Array<string>(),
       kafkaClientId: process.env.KAFKA_CLIENT_ID || '',
       kafkaMessagingEnabled: process.env.KAFKA_MESSAGING_ENABLED === 'true' ? true : false,
+    },
+    auth: {
+      enabled: process.env.AUTH_ENABLED !== 'false',
+      jwtKeyUrl: process.env.JWT_KEY_URL || '',
+      jwtKey: process.env.JWT_KEY || '',
+      WRITE_SCOPE: process.env.WRITE_SCOPE || 'SERVICE.WRITE',
     },
   };
   return config;

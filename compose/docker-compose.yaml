@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   vault:
-    container_name: vault
     image: vault
-
     volumes:
       - $PWD/logs/:/tmp/logs
       - ./vault:/scripts
@@ -20,7 +18,6 @@ services:
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
 
   mongodb:
-    container_name: app_db
     image: 'bitnami/mongodb:4.0'
     ports:
       - '27027:27017'
@@ -96,5 +93,5 @@ services:
 
 volumes:
   mongodb_data:
-    name: appdb_db_vol
+    name: appdb_db_vol_1
     driver: local

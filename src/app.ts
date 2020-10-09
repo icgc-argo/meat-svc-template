@@ -17,15 +17,28 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import express from 'express';
+import express, { Request, RequestHandler, Response } from 'express';
 import bodyParser from 'body-parser';
 import * as swaggerUi from 'swagger-ui-express';
 import path from 'path';
 import yaml from 'yamljs';
 import { AppConfig } from './config';
+import Auth from './auth';
+import log from './logger';
 
 console.log('in App.ts');
 const App = (config: AppConfig): express.Express => {
+  // Auth middleware
+  const noOpReqHandler: RequestHandler = (req, res, next) => {
+    log.warn('calling protected endpoint without auth enabled');
+    next();
+  };
+  const authFilter = config.auth.enabled
+    ? Auth(config.auth.jwtKeyUrl, config.auth.jwtKey)
+    : (scope: string) => {
+        return noOpReqHandler;
+      };
+
   const app = express();
   app.set('port', process.env.PORT || 3000);
   app.use(bodyParser.json());
@@ -38,6 +51,10 @@ const App = (config: AppConfig): express.Express => {
       version: `${process.env.npm_package_version} - ${process.env.SVC_COMMIT_ID}`,
     };
     return res.status(status).send(resBody);
+  });
+
+  app.get('/protected', authFilter(config.auth.WRITE_SCOPE), (req, res) => {
+    return res.send('I am protected');
   });
 
   app.use(
