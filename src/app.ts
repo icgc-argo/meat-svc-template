@@ -17,14 +17,15 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import express, { Request, RequestHandler, Response } from 'express';
+import express, { NextFunction, Request, RequestHandler, Response } from 'express';
 import bodyParser from 'body-parser';
 import * as swaggerUi from 'swagger-ui-express';
 import path from 'path';
 import yaml from 'yamljs';
 import { AppConfig } from './config';
-import Auth from './auth';
+import Auth from '@overture-stack/ego-token-middleware';
 import log from './logger';
+import logger from './logger';
 
 console.log('in App.ts');
 const App = (config: AppConfig): express.Express => {
@@ -35,7 +36,7 @@ const App = (config: AppConfig): express.Express => {
   };
   const authFilter = config.auth.enabled
     ? Auth(config.auth.jwtKeyUrl, config.auth.jwtKey)
-    : (scope: string) => {
+    : (scope: string[]) => {
         return noOpReqHandler;
       };
 
@@ -53,16 +54,57 @@ const App = (config: AppConfig): express.Express => {
     return res.status(status).send(resBody);
   });
 
-  app.get('/protected', authFilter(config.auth.WRITE_SCOPE), (req, res) => {
-    return res.send('I am protected');
-  });
+  const authHandler = authFilter([config.auth.WRITE_SCOPE]);
+
+  app.get(
+    '/protected',
+    authHandler,
+    wrapAsync(async (req: Request, res: Response) => {
+      return res.send('I am protected');
+    }),
+  );
 
   app.use(
     config.openApiPath,
     swaggerUi.serve,
     swaggerUi.setup(yaml.load(path.join(__dirname, './resources/swagger.yaml'))),
   );
+
+  app.use(errorHandler);
   return app;
+};
+
+export const wrapAsync = (fn: RequestHandler): RequestHandler => {
+  return (req, res, next) => {
+    const routePromise = fn(req, res, next);
+    if (routePromise.catch) {
+      routePromise.catch(next);
+    }
+  };
+};
+
+// general catch all error handler
+export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction): any => {
+  logger.error('error handler received error: ', err);
+  if (res.headersSent) {
+    logger.debug('error handler skipped');
+    return next(err);
+  }
+  let status: number;
+  const customizableMsg = err.message;
+
+  switch (true) {
+    case err.name == 'Unauthorized':
+      status = 401;
+      break;
+    case err.name == 'Forbidden':
+      status = 403;
+      break;
+    default:
+      status = 500;
+  }
+  res.status(status).send({ error: err.name, message: customizableMsg });
+  next(err);
 };
 
 export enum Status {
