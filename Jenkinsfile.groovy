@@ -92,8 +92,8 @@ spec:
             }
             steps {
                 container('docker') {
-                    withCredentials([usernamePassword(credentialsId:'argoDockerHub', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                        sh 'docker login -u $USERNAME -p $PASSWORD'
+                    withCredentials([usernamePassword(credentialsId:'argoContainers', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                        sh 'docker login ghcr.io -u $USERNAME -p $PASSWORD'
                     }
 
                     // the network=host needed to download dependencies using the host network (since we are inside 'docker'
@@ -119,7 +119,10 @@ spec:
 
         stage('Release & tag') {
           when {
-            branch "master"
+            anyOf {
+              branch 'master'
+              branch 'main'
+            }
           }
           steps {
               container('docker') {
@@ -127,8 +130,8 @@ spec:
                       sh "git tag ${version}"
                       sh "git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${repoName}/${serviceName} --tags"
                   }
-                  withCredentials([usernamePassword(credentialsId:'argoDockerHub', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                      sh 'docker login -u $USERNAME -p $PASSWORD'
+                  withCredentials([usernamePassword(credentialsId:'argoContainers', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                      sh 'docker login ghcr.io -u $USERNAME -p $PASSWORD'
                   }
                   sh "docker  build --build-arg COMMIT_ID=${commit} --build-arg VERSION=${version} --network=host -f Dockerfile . -t ${dockerRepo}:latest -t ${dockerRepo}:${version}"
                   sh "docker push ${dockerRepo}:${version}"
@@ -139,7 +142,10 @@ spec:
 
         stage('deploy to argo-qa') {
             when {
-                branch "master"
+              anyOf {
+                branch 'master'
+                branch 'main'
+              }
             }
             steps {
                 build(job: "/ARGO/provision/${serviceName}", parameters: [
@@ -155,7 +161,7 @@ spec:
         // i used node container since it has curl already
         container("node") {
           script {
-            if (env.BRANCH_NAME == "master" || env.BRANCH_NAME == "develop") {
+            if (env.BRANCH_NAME == "master" || env.BRANCH_NAME == "main" || env.BRANCH_NAME == "develop") {
               withCredentials([string(credentialsId: 'JenkinsFailuresSlackChannelURL', variable: 'JenkinsFailuresSlackChannelURL')]) { 
                 sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"Build Failed: ${env.JOB_NAME} [${env.BUILD_NUMBER}] (${env.BUILD_URL}) \"}' ${JenkinsFailuresSlackChannelURL}"
               }
@@ -166,7 +172,7 @@ spec:
       fixed {
         container("node") {
           script {
-            if (env.BRANCH_NAME == "master" || env.BRANCH_NAME == "develop") {
+            if (env.BRANCH_NAME == "master" || env.BRANCH_NAME == "main" || env.BRANCH_NAME == "develop") {
               withCredentials([string(credentialsId: 'JenkinsFailuresSlackChannelURL', variable: 'JenkinsFailuresSlackChannelURL')]) { 
                 sh "curl -X POST -H 'Content-type: application/json' --data '{\"text\":\"Build Fixed: ${env.JOB_NAME} [${env.BUILD_NUMBER}] (${env.BUILD_URL}) \"}' ${JenkinsFailuresSlackChannelURL}"
               }

@@ -91,10 +91,12 @@ console.log('in server.ts');
       useNewUrlParser: true,
       user: appConfig.mongoProperties.dbUser,
       pass: appConfig.mongoProperties.dbPassword,
+      w: appConfig.mongoProperties.writeConcern,
+      wtimeout: appConfig.mongoProperties.writeAckTimeout,
     });
   } catch (err) {
     logger.error('MongoDB connection error. Please make sure MongoDB is running. ' + err);
-    process.exit();
+    process.exit(-20);
   }
 
   /**
