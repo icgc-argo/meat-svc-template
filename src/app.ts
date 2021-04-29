@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Ontario Institute for Cancer Research. All rights reserved
+ * Copyright (c) 2021 The Ontario Institute for Cancer Research. All rights reserved
  *
  * This program and the accompanying materials are made available under the terms of
  * the GNU Affero General Public License v3.0. You should have received a copy of the
@@ -24,14 +24,13 @@ import path from 'path';
 import yaml from 'yamljs';
 import { AppConfig } from './config';
 import Auth from '@overture-stack/ego-token-middleware';
-import log from './logger';
 import logger from './logger';
 
 console.log('in App.ts');
 const App = (config: AppConfig): express.Express => {
   // Auth middleware
   const noOpReqHandler: RequestHandler = (req, res, next) => {
-    log.warn('calling protected endpoint without auth enabled');
+    logger.warn('calling protected endpoint without auth enabled');
     next();
   };
   const authFilter = config.auth.enabled
@@ -60,7 +59,11 @@ const App = (config: AppConfig): express.Express => {
     '/protected',
     authHandler,
     wrapAsync(async (req: Request, res: Response) => {
-      return res.send('I am protected');
+      const r = await new Promise<string>((reso, rej) => {
+         reso('Hello World from Protected');
+      });
+
+      return res.status(200).send(r);
     }),
   );
 
@@ -76,7 +79,7 @@ const App = (config: AppConfig): express.Express => {
 
 export const wrapAsync = (fn: RequestHandler): RequestHandler => {
   return (req, res, next) => {
-    const routePromise = fn(req, res, next);
+    const routePromise = fn(req, res, next) as any;
     if (routePromise.catch) {
       routePromise.catch(next);
     }
